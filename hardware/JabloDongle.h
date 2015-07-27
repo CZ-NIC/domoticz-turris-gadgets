@@ -4,6 +4,8 @@
 #include "ASyncSerial.h"
 #include <iostream>
 
+//#define OLDFW
+
 #define SUBSWITCH_SENSOR	0
 #define SUBSWITCH_TAMPER	1
 #define SUBSWITCH_BUTTON	2
@@ -67,7 +69,9 @@ enum ja_mtype {
 class JaMessage {
 public:
 	unsigned int did;
+#ifdef OLDFW
 	int mid;
+#endif
 	std::string devmodel;
 	enum ja_mtype mtype;
 	int act, lb, blackout;

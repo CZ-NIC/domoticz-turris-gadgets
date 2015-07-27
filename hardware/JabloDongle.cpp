@@ -210,6 +210,7 @@ JaMessage CJabloDongle::ParseMessage(std::string msgstring) {
 				if(sscanf(msgtok.c_str(), "[%u]", &msg.did) != 1)
 					break;
 			}
+#ifdef OLDFW
 			else if(tokNum == 1) {
 				if(sscanf(msgtok.c_str(), "ID:%u", &msg.mid) != 1) {
 					msg.mid = -1;
@@ -217,10 +218,19 @@ JaMessage CJabloDongle::ParseMessage(std::string msgstring) {
 						break;
 				}
 			}
+#endif
+#ifdef OLDFW
 			else if(tokNum == 2) {
+#else
+			else if(tokNum == 1) {
+#endif
 				msg.devmodel = msgtok;
 			}
+#ifdef OLDFW
 			else if(tokNum == 3) {
+#else
+			else if(tokNum == 2) {
+#endif
 				if(msgtok == "SENSOR") {
 					msg.mtype = JMTYPE_SENSOR;
 				}
@@ -402,6 +412,7 @@ void CJabloDongle::ReadCallback(const char *data, size_t len)
 
 			jmsg = ParseMessage(std::string((char*)msgline));
 
+#ifdef OLDFW
 			//quick and dirty hack for msg deduplication, will be removed in final version
 			if((jmsg.mid == -1) && ((jmsg.mtype != last_mtype) || ((jmsg.mtype != JMTYPE_SET) && (jmsg.mtype != JMTYPE_INT)))) {
 				ProcessMessage(jmsg);
@@ -411,6 +422,9 @@ void CJabloDongle::ReadCallback(const char *data, size_t len)
 				ProcessMessage(jmsg);
 				last_mid = jmsg.mid;
 			}
+#else
+			ProcessMessage(jmsg);
+#endif
 
 		}
 	}while(messagesInBuffer);
@@ -693,8 +707,13 @@ void CJabloDongle::TransmitState(void) {
 }
 
 // ------------------------------------------------------------------------------------------------
+#ifdef OLDFW
 JaMessage::JaMessage() : did(0), mid(-1), devmodel("Unknown"), mtype(JMTYPE_UNDEF), lb(-1), act(-1), blackout(-1), slot_num(0), slot_val(0), temp(0) {
 }
+#else
+JaMessage::JaMessage() : did(0), devmodel("Unknown"), mtype(JMTYPE_UNDEF), lb(-1), act(-1), blackout(-1), slot_num(0), slot_val(0), temp(0) {
+}
+#endif
 
 std::string JaMessage::MtypeAsString() {
 	const char* names[] = {"UNDEF", "ARM", "DISARM", "BEACON", "SENSOR", "TAMPER", "PANIC", "DEFECT", "BUTTON", "SET", "INT", "OK", "ERR", "SLOT", "VERSION"};
