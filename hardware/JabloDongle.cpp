@@ -31,7 +31,7 @@ int CJabloDongle::ProbeDongle(void) {
 
 	writeString("\nWHO AM I?\n");
 
-	boost::system_time timeout = boost::get_system_time() + boost::posix_time::milliseconds(500);
+	boost::system_time timeout = boost::get_system_time() + boost::posix_time::milliseconds(1000);
 	if(!probeCond.timed_wait(probeLock, timeout)) {
 		//Vyhucelo na timeout
 		_log.Log(LOG_ERROR, "Turris Dongle not found on port %s!", m_szSerialPort.c_str());
@@ -85,7 +85,7 @@ void CJabloDongle::Do_Work() {
 		if(!isOpen()) {
 			OpenSerialDevice();
 			if(ProbeDongle()) {
-				StopHardware();
+				m_stoprequested = true;
 			}
 			ReadSlots();
 			SendSwitchIfNotExists(0x1000000, SUBSWITCH_PGX, 0, false, 0, "PGX");
