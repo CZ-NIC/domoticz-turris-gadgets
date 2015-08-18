@@ -70,6 +70,7 @@
 #include "../hardware/NestThermostat.h"
 #include "../hardware/Thermosmart.h"
 #include "../hardware/JabloDongle.h"
+#include "../hardware/TurrisThermo.h"
 
 // load notifications configuration
 #include "../notifications/NotificationHelper.h"
@@ -742,6 +743,9 @@ bool MainWorker::AddHardwareFromParams(
 		break;
 	case HTYPE_JabloDongle:
 		pHardware = new CJabloDongle(ID, SerialPort, 57600);
+		break;
+	case HTYPE_TurrisThermo:
+		pHardware = new CTurrisThermo(ID);
 		break;
 	}
 

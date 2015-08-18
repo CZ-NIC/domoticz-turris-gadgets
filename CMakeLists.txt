@@ -164,6 +164,7 @@ main/DataPush.cpp
 main/HttpPush.cpp
 httpclient/HTTPClient.cpp
 httpclient/UrlEncode.cpp
+hardware/TurrisThermo.cpp
 hardware/JabloDongle.cpp
 hardware/1Wire.cpp
 hardware/1Wire/1WireByOWFS.cpp

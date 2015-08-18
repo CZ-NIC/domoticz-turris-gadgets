@@ -108,7 +108,8 @@ enum _eHardwareTypes {
 	HTYPE_Pinger,				//51
 	HTYPE_NESTTHERMOSTAT,		//52
 	HTYPE_THERMOSMART,			//53
-	HTYPE_JabloDongle,
+	HTYPE_JabloDongle,			//54
+	HTYPE_TurrisThermo,			//55
 	HTYPE_END
 };
 

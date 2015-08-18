@@ -94,6 +94,7 @@ private:
 	friend class CNestThermostat;
 	friend class CThermosmart;
 	friend class CJabloDongle;
+	friend class CTurrisThermo;
 
 	virtual bool StartHardware()=0;
 	virtual bool StopHardware()=0;

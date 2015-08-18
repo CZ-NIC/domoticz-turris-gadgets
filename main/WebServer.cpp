@@ -996,6 +996,9 @@ namespace http {
 			else if (htype == HTYPE_JabloDongle) {
 				//all fine here!
 			}
+			else if (htype == HTYPE_TurrisThermo) {
+				//all fine here!
+			}
 			else
 				return;
 
@@ -1171,6 +1174,9 @@ namespace http {
 			}
 			else if (htype == HTYPE_JabloDongle) {
 					//all fine here too
+			}
+			else if (htype == HTYPE_TurrisThermo) {
+				//all fine here too
 			}
 			else
 				return;

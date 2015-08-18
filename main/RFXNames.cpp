@@ -191,6 +191,7 @@ const char *Hardware_Type_Desc(int hType)
 		{ HTYPE_NESTTHERMOSTAT, "Nest Thermostat" },
 		{ HTYPE_THERMOSMART, "Thermosmart Thermostat" },
 		{ HTYPE_JabloDongle, "Jablotron USB Turris Dongle" },
+		{ HTYPE_TurrisThermo, "Turris Router CPU + Board Temperature" },
 		{ 0, NULL, NULL }
 	};
 	return findTableIDSingle1 (Table, hType);
