@@ -15,7 +15,7 @@
 #define I2C_ADDRESS_7_THERMOMETER 0x4C
 
 #define BUFFSIZE 64
-#define HANDLE_ERROR() _log.Log(LOG_ERROR, "TurrisThermo %s\n", strerror(errno))
+#define HANDLE_ERROR() _log.Log(LOG_ERROR, "TurrisThermo:%d %s\n",__LINE__, strerror(errno))
 
 CTurrisThermo::CTurrisThermo(const int ID)
 {
@@ -87,6 +87,7 @@ void CTurrisThermo::GetSensorDetails()
 	}
 	if (ioctl(fd, I2C_SLAVE, I2C_ADDRESS_7_THERMOMETER) < 0) {
 		HANDLE_ERROR();
+		close(fd);
 		return;
 	}
 
@@ -96,10 +97,12 @@ void CTurrisThermo::GetSensorDetails()
 	buff[0] = 0x00;
 	if (write(fd, buff, 1) != 1) {
 		HANDLE_ERROR();
+		close(fd);
 		return;
 	}
 	if (read(fd, buff, 1) != 1) {
 		HANDLE_ERROR();
+		close(fd);
 		return;
 	} else {
 		SendTempSensor(1, 100, (float)(buff[0]), "Turris Board Temp");
@@ -108,12 +111,16 @@ void CTurrisThermo::GetSensorDetails()
 	buff[0] = 0x01;
 	if (write(fd, buff, 1) != 1) {
 		HANDLE_ERROR();
+		close(fd);
 		return;
 	}
 	if (read(fd, buff, 1) != 1) {
 		HANDLE_ERROR();
+		close(fd);
 		return;
 	} else {
 		SendTempSensor(0, 100, (float)(buff[0]), "Turris CPU Temp");
 	}
+
+	close(fd);
 }
