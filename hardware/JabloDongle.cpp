@@ -99,6 +99,15 @@ void CJabloDongle::Do_Work() {
 			if(!SendSwitchIfNotExists(0x1000003, 0, 0, false, 0, "ENROLL")) {
 				SetSwitchIcon(0x1000003, 0, 9);
 			}
+
+			//add smoke detectors at startup (they are difficult to activate :-) )
+			for(std::vector<Ja_device*>::iterator i = slots.begin(); i != slots.end(); i++) {
+				if((*i)->model == JDEV_JA85ST) {
+					std::stringstream dev_desc;
+					dev_desc << (*i)->ModelAsString() << "_" << std::setfill('0') << (*i)->id << "_SENSOR";
+					SendSwitchIfNotExists((*i)->id, SUBSWITCH_SENSOR, 0, false, 0, dev_desc.str());
+				}
+			}
 		}
 	}
 	_log.Log(LOG_STATUS,"JabloDongle: Worker stopped...");
@@ -274,23 +283,6 @@ JaMessage CJabloDongle::ParseMessage(std::string msgstring) {
 
 void CJabloDongle::ProcessMessage(JaMessage jmsg) {
 	Ja_device *jdev;
-
-	/*if((jmsg.mtype != JMTYPE_SLOT) && (jmsg.mtype != JMTYPE_VERSION) && (jmsg.mtype != JMTYPE_OK) && (jmsg.mtype != JMTYPE_ERR)) {
-		for(std::vector<Ja_device*>::iterator i = slots.begin(); i != slots.end(); i++) {
-			if((*i)->id == jmsg.did) {
-				boost::posix_time::ptime time_now = boost::posix_time::microsec_clock::local_time();
-				if(((time_now - (*i)->last_message_time) < boost::posix_time::milliseconds(1000)) && ((*i)->last_message_type == jmsg.mtype)) {
-					(*i)->last_message_time = time_now;
-					return;
-				}
-				else {
-					(*i)->last_message_time = time_now;
-					(*i)->last_message_type = jmsg.mtype;
-				}
-				break;
-			}
-		}
-	}*/
 
 	if((jmsg.mtype != JMTYPE_SLOT) && (jmsg.mtype != JMTYPE_VERSION) && (jmsg.mtype != JMTYPE_OK) && (jmsg.mtype != JMTYPE_ERR)) {
 		_log.Log(LOG_STATUS, "Received message of type %s from device %d (%s)", jmsg.MtypeAsString().c_str(), jmsg.did, jmsg.devmodel.c_str());
@@ -580,17 +572,21 @@ void CJabloDongle::SendSetPointSensor(int NodeID, const int BatteryLevel, const 
 bool CJabloDongle::WriteToHardware(const char *pdata, const unsigned char length)
 {
 	unsigned int id;
+	bool retval;
 	_log.Log(LOG_STATUS, "JabloDongle: WriteToHardware");
 
 	tRBUF *tsen = (tRBUF*) pdata;
 	_log.Log(LOG_STATUS, "packet type = 0x%x", tsen->LIGHTING2.packettype);
 
 	if(tsen->LIGHTING2.packettype != pTypeLighting2) {
+		//unknown hardware type
 		return false;
 	}
 
 	id = (tsen->LIGHTING2.id1 << 24) | (tsen->LIGHTING2.id2 << 16) | (tsen->LIGHTING2.id3 << 8) | (tsen->LIGHTING2.id4);
 	_log.Log(LOG_STATUS, "id = %d, cmnd = %d, level = %d", id, tsen->LIGHTING2.cmnd, tsen->LIGHTING2.level);
+
+	retval = false;
 
 	if(id == 0x1000000) { //ID of PGX and PGY switches
 		switch(tsen->LIGHTING2.cmnd) {
@@ -615,6 +611,7 @@ bool CJabloDongle::WriteToHardware(const char *pdata, const unsigned char length
 				break;
 			}
 		}
+		retval = true;
 	}
 	else if(id == 0x1000001) { //ID of siren (loud sound)
 		switch(tsen->LIGHTING2.cmnd) {
@@ -631,6 +628,7 @@ bool CJabloDongle::WriteToHardware(const char *pdata, const unsigned char length
 				break;
 			}
 		}
+		retval = true;
 	}
 	else if(id == 0x1000002) { //ID of siren (beep), implemented as dimmer. Field 'level' is in range from 0 to 14 (0 to 100%)
 		switch(tsen->LIGHTING2.cmnd) {
@@ -663,6 +661,7 @@ bool CJabloDongle::WriteToHardware(const char *pdata, const unsigned char length
 				break;
 			}
 		}
+		retval = true;
 	}
 	else if(id == 0x1000003) { //ID of ENROLL switch
 		switch(tsen->LIGHTING2.cmnd) {
@@ -679,22 +678,54 @@ bool CJabloDongle::WriteToHardware(const char *pdata, const unsigned char length
 				break;
 			}
 		}
+		retval = true;
 	}
-	else if(((Ja_device::ModelFromID(id) == JDEV_JA83P) || (Ja_device::ModelFromID(id) == JDEV_JA82SH) || (Ja_device::ModelFromID(id) == JDEV_JA85ST)) && (tsen->LIGHTING2.unitcode == SUBSWITCH_SENSOR)) {
-		//enable resetting status of momentary sensors by user
-		if(!((tsen->LIGHTING2.cmnd == light2_sOff) || (tsen->LIGHTING2.cmnd == light2_sOff)))
-			return false;
-	}
-	else if(tsen->LIGHTING2.unitcode == SUBSWITCH_BUTTON) {
-		//enable resetting status of 'button' momentary subdevices by user
-		if(!((tsen->LIGHTING2.cmnd == light2_sOff) || (tsen->LIGHTING2.cmnd == light2_sOff)))
-			return false;
-	}
-	else {
-		return false;
+	else { //ID of a real sensor
+		if(((Ja_device::ModelFromID(id) == JDEV_JA83P) || (Ja_device::ModelFromID(id) == JDEV_JA82SH) || (Ja_device::ModelFromID(id) == JDEV_JA85ST)) && (tsen->LIGHTING2.unitcode == SUBSWITCH_SENSOR)) {
+			//enable resetting status of momentary sensors by user
+			switch(tsen->LIGHTING2.cmnd) {
+				case light2_sOff:
+				case light2_sGroupOff: {
+					retval = true;
+					break;
+				}
+			}
+		}
+		else if((Ja_device::ModelFromID(id) == JDEV_JA80L) && (tsen->LIGHTING2.unitcode == SUBSWITCH_TAMPER)) {
+			//enable resetting status of JA-80L's momentary tamper by user
+			switch(tsen->LIGHTING2.cmnd) {
+				case light2_sOff:
+				case light2_sGroupOff: {
+					retval = true;
+					break;
+				}
+			}
+		}
+		else if(((Ja_device::ModelFromID(id) == JDEV_JA80L) || (Ja_device::ModelFromID(id) == JDEV_JA85ST)) && (tsen->LIGHTING2.unitcode == SUBSWITCH_BUTTON)) {
+			//enable resetting status of 'button' momentary subdevices by user
+			switch(tsen->LIGHTING2.cmnd) {
+				case light2_sOff:
+				case light2_sGroupOff: {
+					retval = true;
+					break;
+				}
+			}
+		}
+		else if((Ja_device::ModelFromID(id) == JDEV_RC86K) && (tsen->LIGHTING2.unitcode == SUBSWITCH_ARM)) {
+			//enable setting and resetting status of keychain switch by user
+			switch(tsen->LIGHTING2.cmnd) {
+				case light2_sOn:
+				case light2_sGroupOn:
+				case light2_sOff:
+				case light2_sGroupOff: {
+					retval = true;
+					break;
+				}
+			}
+		}
 	}
 
-	return true;
+	return retval;
 }
 
 void CJabloDongle::TransmitState(void) {

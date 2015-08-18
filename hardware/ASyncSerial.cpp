@@ -36,6 +36,7 @@
 
 #ifndef WIN32
 #include <sys/ioctl.h>
+#include <sys/file.h>
 #endif
 
 //
@@ -107,6 +108,7 @@ void AsyncSerial::open(const std::string& devname, unsigned int baud_rate,
 #ifndef WIN32
     boost::asio::serial_port::native_handle_type sfd = pimpl->port.native_handle();
     ioctl(sfd, TIOCEXCL);
+    flock(sfd, LOCK_EX);
 #endif
     pimpl->port.set_option(boost::asio::serial_port_base::baud_rate(baud_rate));
     pimpl->port.set_option(opt_parity);
@@ -172,6 +174,10 @@ void AsyncSerial::close()
     pimpl->io.post(boost::bind(&AsyncSerial::doClose, this));
     pimpl->backgroundThread.join();
     pimpl->io.reset();
+#ifndef WIN32
+    boost::asio::serial_port::native_handle_type sfd = pimpl->port.native_handle();
+    flock(sfd, LOCK_UN);
+#endif
     if(errorStatus())
     {
         throw(boost::system::system_error(boost::system::error_code(),
