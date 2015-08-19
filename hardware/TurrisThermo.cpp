@@ -6,21 +6,15 @@
 #include "../main/localtime_r.h"
 #include "../main/mainworker.h"
 
-#include <linux/i2c-dev.h>
-
-#define TURRIS_THERMO_POLL_INTERVAL 30
-
-
-#define I2C_LOCAL "/dev/i2c-0"
-#define I2C_ADDRESS_7_THERMOMETER 0x4C
-
-#define BUFFSIZE 64
-#define HANDLE_ERROR() _log.Log(LOG_ERROR, "TurrisThermo:%d %s\n",__LINE__, strerror(errno))
+#define TURRIS_THERMO_POLL_INTERVAL 15
+#define TURRIS_THERMO_SENSOR_NAME	"sa56004-i2c-0-4c"
 
 CTurrisThermo::CTurrisThermo(const int ID)
 {
-	m_HwdID=ID;
-	m_stoprequested=false;
+	m_HwdID = ID;
+	m_stoprequested = false;
+	turrisThState = TURRIS_TH_INIT;
+	nptr = NULL;
 }
 
 CTurrisThermo::~CTurrisThermo(void)
@@ -31,43 +25,71 @@ bool CTurrisThermo::StartHardware()
 {
 	//Start worker thread
 	m_thread = boost::shared_ptr<boost::thread>(new boost::thread(boost::bind(&CTurrisThermo::Do_Work, this)));
-	m_bIsStarted=true;
+	m_bIsStarted = true;
 	sOnConnected(this);
 
-	return (m_thread!=NULL);
+	return (m_thread != NULL);
 }
 
 bool CTurrisThermo::StopHardware()
 {
-	if (m_thread!=NULL)
+	if (m_thread != NULL)
 	{
 		assert(m_thread);
 		m_stoprequested = true;
 		m_thread->join();
 	}
-	m_bIsStarted=false;
+	m_bIsStarted = false;
     return true;
 }
 
 void CTurrisThermo::Do_Work()
 {
+	int nr = 0;
+	sensors_chip_name name;
 	int sec_counter = TURRIS_THERMO_POLL_INTERVAL - 5;
-	_log.Log(LOG_STATUS,"TurrisThermo: Worker started...");
+
 	while (!m_stoprequested)
 	{
-		sleep_seconds(1);
-		sec_counter++;
-		if ((sec_counter % 12) == 0)
-		{
-			m_LastHeartbeat = mytime(NULL);
+		switch(turrisThState) {
+			case TURRIS_TH_INIT: {
+				sensors_init(NULL);
+				sensors_parse_chip_name(TURRIS_THERMO_SENSOR_NAME, &name);
+
+				nptr = sensors_get_detected_chips(&name, &nr);
+				if(nptr == NULL) {
+					_log.Log(LOG_ERROR, "TurrisThermo: Temperature monitoring chip not found!");
+					turrisThState = TURRIS_TH_END;
+				}
+				else {
+					_log.Log(LOG_STATUS, "TurrisThermo: Worker started...");
+					turrisThState = TURRIS_TH_READING;
+				}
+				break;
+			}
+			case TURRIS_TH_READING: {
+				sleep_seconds(1);
+				sec_counter++;
+				if((sec_counter % 12) == 0)	{
+					m_LastHeartbeat = mytime(NULL);
+				}
+
+				if ((sec_counter % TURRIS_THERMO_POLL_INTERVAL) == 0) {
+					GetSensorDetails();
+				}
+				break;
+			}
+			case TURRIS_TH_END: {
+				m_stoprequested = true;
+				break;
+			}
 		}
 
-		if ((sec_counter % TURRIS_THERMO_POLL_INTERVAL) == 0)
-		{
-			GetSensorDetails();
-		}
 	}
-	_log.Log(LOG_STATUS,"TurrisThermo: Worker stopped...");
+
+	sensors_free_chip_name(&name);
+	sensors_cleanup();
+	_log.Log(LOG_STATUS, "TurrisThermo: Worker stopped...");
 }
 
 bool CTurrisThermo::WriteToHardware(const char *pdata, const unsigned char length)
@@ -77,50 +99,21 @@ bool CTurrisThermo::WriteToHardware(const char *pdata, const unsigned char lengt
 
 void CTurrisThermo::GetSensorDetails()
 {
-	const char *path = I2C_LOCAL;
-	int fd;
+	double val;
+	int nf = 0;
+	const sensors_feature* fptr;
+	const sensors_subfeature* sptr;
 
-	fd = open(path, O_RDWR);
-	if (fd < 0) {
-		_log.Log(LOG_ERROR, "TurrisThermo: Cannot open device \"%s\" (%s)", path, strerror(errno));
-		return;
-	}
-	if (ioctl(fd, I2C_SLAVE, I2C_ADDRESS_7_THERMOMETER) < 0) {
-		HANDLE_ERROR();
-		close(fd);
-		return;
-	}
+	while((fptr = sensors_get_features(nptr, &nf)) != NULL) {
+		sptr = sensors_get_subfeature(nptr, fptr, SENSORS_SUBFEATURE_TEMP_INPUT);
+		sensors_get_value(nptr, sptr->number, &val);
 
-	//Prepare data
-	char buff[BUFFSIZE];
-	//Read local temperature
-	buff[0] = 0x00;
-	if (write(fd, buff, 1) != 1) {
-		HANDLE_ERROR();
-		close(fd);
-		return;
-	}
-	if (read(fd, buff, 1) != 1) {
-		HANDLE_ERROR();
-		close(fd);
-		return;
-	} else {
-		SendTempSensor(1, 100, (float)(buff[0]), "Turris Board Temp");
-	}
-	//Read remote temperature
-	buff[0] = 0x01;
-	if (write(fd, buff, 1) != 1) {
-		HANDLE_ERROR();
-		close(fd);
-		return;
-	}
-	if (read(fd, buff, 1) != 1) {
-		HANDLE_ERROR();
-		close(fd);
-		return;
-	} else {
-		SendTempSensor(0, 100, (float)(buff[0]), "Turris CPU Temp");
+		if(fptr->number == 0) {
+			SendTempSensor(0, 100, (const float)val, "Turris Board Temp");
+		}
+		else if(fptr->number == 1) {
+			SendTempSensor(1, 100, (const float)val, "Turris CPU Temp");
+		}
 	}
 
-	close(fd);
 }

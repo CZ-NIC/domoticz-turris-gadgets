@@ -425,6 +425,21 @@ else()
   message(STATUS "Not building on Raspberry Pi. GPIO support disabled.")
 ENDIF(RaspberryPi)
 
+FIND_LIBRARY(SENSORS_LIBRARY NAMES libsensors sensors)
+IF(SENSORS_LIBRARY)
+  MESSAGE(STATUS "libsensors library found at: ${SENSORS_LIBRARY}")
+  target_link_libraries(domoticz ${SENSORS_LIBRARY})
+ELSE(SENSORS_LIBRARY)
+  MESSAGE(FATAL_ERROR "libsensors not found on your system")
+ENDIF(SENSORS_LIBRARY)
+
+FIND_PATH(SENSORS_INCLUDE_DIRS NAMES sensors/sensors.h)
+IF(SENSORS_INCLUDE_DIRS)
+  MESSAGE(STATUS "libsensors includes found at: ${SENSORS_INCLUDE_DIRS}")
+ELSE(SENSORS_INCLUDE_DIRS)
+  MESSAGE(FATAL_ERROR "libsensors includes not found on your system")
+ENDIF(SENSORS_INCLUDE_DIRS)
+
 target_link_libraries(domoticz ${Boost_LIBRARIES} ${ZLIB_LIBRARIES} ${CURL_LIBRARIES} pthread lua mqtt sqlite ${CMAKE_DL_LIBS})
 
 ADD_PRECOMPILED_HEADER(domoticz "main/stdafx.h")
