@@ -12,6 +12,7 @@ CJabloDongle::CJabloDongle(const int ID, const std::string& devname, unsigned in
 {
 	m_HwdID=ID;
 	m_bSkipReceiveCheck = true;
+	m_stoprequested = false;
 	m_bufferpos = 0;
 	memset(m_buffer, 0, sizeof(m_buffer));
 	m_szSerialPort = devname;
