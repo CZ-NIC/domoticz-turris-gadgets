@@ -192,6 +192,7 @@ JaMessage CJabloDongle::ParseMessage(std::string msgstring) {
 	std::stringstream msgstream(msgstring);
 	std::string msgtok;
 	int tokNum;
+	bool singlePlaceTemp = false;
 
 	if(msgstring == "\nOK\n") {
 		msg.mtype = JMTYPE_OK;
@@ -265,9 +266,28 @@ JaMessage CJabloDongle::ParseMessage(std::string msgstring) {
 				else if(sscanf(msgtok.c_str(), "INT:%f", &msg.temp) == 1) {
 					msg.mtype = JMTYPE_INT;
 				}
+				else if(msgtok == "SET:") {
+					msg.mtype = JMTYPE_SET;
+					singlePlaceTemp = true;
+				}
+				else if(msgtok == "INT:") {
+					msg.mtype = JMTYPE_INT;
+					singlePlaceTemp = true;
+				}
 				else {
 					msg.mtype = JMTYPE_UNDEF;
 				}
+			}
+#ifdef OLDFW
+			else if((tokNum == 4) && (singlePlaceTemp == true)) {
+#else
+			else if((tokNum == 3) && (singlePlaceTemp == true)) {
+#endif
+				if(sscanf(msgtok.c_str(), "%f", &msg.temp) != 1) {
+					msg.temp = 0;
+					msg.mtype = JMTYPE_UNDEF;
+				}						
+				singlePlaceTemp = false;
 			}
 			else {
 				if(sscanf(msgtok.c_str(), "LB:%d", &msg.lb) != 1)
